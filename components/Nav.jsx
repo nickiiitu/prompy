@@ -9,7 +9,6 @@ import { usePathname } from "next/navigation";
 const Nav = () => {
   const { data: session, user } = useSession();
   const pathname = usePathname();
-  console.log(session?.user, session);
   const [toggleDropdown, setToggleDropdown] = useState(false);
 
   return pathname === "/auth" ? (

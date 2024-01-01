@@ -3,7 +3,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt, { compare } from "bcrypt";
 import User from "@models/user";
-import { connectToDB } from "@utils/database";
+import { connectToDB, connectSQL } from "@utils/database";
 import { NextResponse } from "next/server";
 import GitHubProvider from "next-auth/providers/github";
 const handler = NextAuth({
@@ -71,27 +71,73 @@ const handler = NextAuth({
     async session({ session, token }) {
       // store the user id from MongoDB to session
       console.log(token, "session");
-      const sessionUser = await User.findOne({ email: session.user.email });
-      session.user.id = sessionUser._id.toString();
-
+      const userExisitQuery = "SELECT * from user where email=?";
+      connectSQL.query(userExisitQuery, session.user.email, (err, res) => {
+        if (res.length > 0) {
+          session.user.id = res[0].id;
+          console.log(session);
+        }
+      });
+      // const sessionUser = await User.findOne({ email: session.user.email });
       return session;
     },
+    //mongodb
+    // async signIn({ account, profile, user, credentials }) {
+    //   if (account.provider === "google" || account.provider === "github") {
+    //     try {
+    //       await connectToDB();
+    //       // check if user already exists
+    //       console.log(profile);
+    //       const userExists = await User.findOne({ email: profile.email });
+    //       // if not, create a new document and save user in MongoDB
+    //       if (!userExists) {
+    //         await User.create({
+    //           email: profile.email,
+    //           username: profile.name.replace(" ", "").toLowerCase(),
+    //           image: profile.picture ? profile.picture : profile.avatar_url,
+    //         });
+    //       }
+
+    //       return true;
+    //     } catch (error) {
+    //       console.log("Error checking if user exists: ", error.message);
+    //       return false;
+    //     }
+    //   }
+
+    //   return true;
+    // },
+
+    //---------------------SQL---------------------------
     async signIn({ account, profile, user, credentials }) {
       if (account.provider === "google" || account.provider === "github") {
         try {
-          await connectToDB();
           // check if user already exists
-          console.log(profile);
-          const userExists = await User.findOne({ email: profile.email });
-          // if not, create a new document and save user in MongoDB
-          if (!userExists) {
-            await User.create({
-              email: profile.email,
-              username: profile.name.replace(" ", "").toLowerCase(),
-              image: profile.picture ? profile.picture : profile.avatar_url,
-            });
-          }
-
+          const userExisitQuery = "SELECT * from user where email=?";
+          connectSQL.query(userExisitQuery, profile.email, (err, res) => {
+            if (res.length <= 0) {
+              console.log(err, "err");
+              const insertQuery =
+                "INSERT INTO user (username,email,image) VALUES (?,?,?)";
+              connectSQL.query(
+                insertQuery,
+                [
+                  profile.name.replace(" ", "").toLowerCase(),
+                  profile.email,
+                  profile.picture ? profile.picture : profile.avatar_url,
+                ],
+                (error, result) => {
+                  if (error) {
+                    console.log(error, "error");
+                  } else {
+                    console.log(result, "result");
+                  }
+                }
+              );
+            } else {
+              console.log(res, "res");
+            }
+          });
           return true;
         } catch (error) {
           console.log("Error checking if user exists: ", error.message);

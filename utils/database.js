@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+import mysql from "mysql";
 let isConnected = false; // track the connection
 
 export const connectToDB = async () => {
@@ -25,3 +25,10 @@ export const connectToDB = async () => {
     console.log(error);
   }
 };
+
+export const connectSQL = mysql.createPool({
+  host: "localhost",
+  user: "root",
+  password: "password",
+  database: "prompy",
+});
