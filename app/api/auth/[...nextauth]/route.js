@@ -16,72 +16,25 @@ const handler = NextAuth({
       clientId: process.env.GITHUB_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
     }),
-    // CredentialsProvider({
-    //   // The name to display on the sign in form (e.g. "Sign in with...")
-    //   name: "Credentials",
-    //   // `credentials` is used to generate a form on the sign in page.
-    //   // You can specify which fields should be submitted, by adding keys to the `credentials` object.
-    //   // e.g. domain, username, password, 2FA token, etc.
-    //   // You can pass any HTML attribute to the <input> tag through the object.
-    //   credentials: {
-    //     username: {
-    //       label: "Email",
-    //       type: "email",
-    //       placeholder: "nik@gmail.com",
-    //     },
-    //     password: { label: "Password", type: "password" },
-    //   },
-    //   async authorize(credentials) {
-    //     // Add logic here to look up the user from the credentials supplied
-    //     const isConnected = await connectToDB();
-    //     console.log(isConnected);
-    //     console.log(credentials.email, "cred");
-    //     const user = await User.findOne({ email: credentials.email });
-    //     console.log(user, "user");
-    //     if (!user) {
-    //       let userToSave = {
-    //         password: credentials.password,
-    //         email: credentials.email,
-    //       };
-    //       const salt = await bcrypt.genSalt(10);
-    //       const hash = await bcrypt.hash(credentials.password, salt);
-    //       userToSave.password = hash;
-    //       const savedUser = await User.create(userToSave);
-    //       return new NextResponse(savedUser, { status: 200 });
-    //       // Any object returned will be saved in `user` property of the JWT
-    //     }
-    //     // If you return null then an error will be displayed advising the user to check their details.
-    //     try {
-    //       const check = await bcrypt.compare(
-    //         credentials?.password,
-    //         user?.password
-    //       );
-    //       console.log(check);
-    //       delete user?.password;
-    //       return new NextResponse(user, { status: 200 });
-    //     } catch (error) {
-    //       return new NextResponse({ error }, { status: 401 });
-    //     }
-    //     // You can also Reject this callback with an Error thus the user will be sent to the error page with the error message as a query parameter
-    //     // return null;
-    //   },
-    // }),
   ],
   callbacks: {
     async session({ session, token }) {
       // store the user id from MongoDB to session
-      console.log(token, "session");
+      let sessionUser = session;
       const userExisitQuery = "SELECT * from user where email=?";
-      connectSQL.query(userExisitQuery, session.user.email, (err, res) => {
-        if (res.length > 0) {
-          session.user.id = res[0].id;
-          console.log(session);
-        }
+      const result = await new Promise((resolve, reject) => {
+        connectSQL.query(userExisitQuery, session.user.email, (err, res) => {
+          if (res.length > 0) {
+            resolve(res);
+          }
+          reject(err);
+        });
       });
+      sessionUser.user.id = result[0].id;
       // const sessionUser = await User.findOne({ email: session.user.email });
-      return session;
+      return sessionUser;
     },
-    //mongodb
+    //--------------------mongodb--------------------------
     // async signIn({ account, profile, user, credentials }) {
     //   if (account.provider === "google" || account.provider === "github") {
     //     try {
@@ -116,9 +69,9 @@ const handler = NextAuth({
           const userExisitQuery = "SELECT * from user where email=?";
           connectSQL.query(userExisitQuery, profile.email, (err, res) => {
             if (res.length <= 0) {
-              console.log(err, "err");
               const insertQuery =
                 "INSERT INTO user (username,email,image) VALUES (?,?,?)";
+
               connectSQL.query(
                 insertQuery,
                 [
@@ -130,12 +83,12 @@ const handler = NextAuth({
                   if (error) {
                     console.log(error, "error");
                   } else {
-                    console.log(result, "result");
+                    // console.log(result, "result");
                   }
                 }
               );
             } else {
-              console.log(res, "res");
+              // console.log(res, "res");
             }
           });
           return true;

@@ -16,7 +16,6 @@ const MyProfile = () => {
     const fetchPosts = async () => {
       const response = await fetch(`/api/users/${session?.user.id}/posts`);
       const data = await response.json();
-
       setMyPosts(data);
     };
 
@@ -24,7 +23,8 @@ const MyProfile = () => {
   }, [session?.user.id]);
 
   const handleEdit = (post) => {
-    router.push(`/update-prompt?id=${post._id}`);
+    const id = post._id ? post._id : post.id;
+    router.push(`/update-prompt?id=${id}`);
   };
 
   const handleDelete = async (post) => {
@@ -33,12 +33,16 @@ const MyProfile = () => {
     );
 
     if (hasConfirmed) {
+      const id = post._id ? post._id : post.id;
+
       try {
-        await fetch(`/api/prompt/${post._id.toString()}`, {
+        await fetch(`/api/prompt/${id.toString()}`, {
           method: "DELETE",
         });
 
-        const filteredPosts = myPosts.filter((item) => item._id !== post._id);
+        const filteredPosts = myPosts.filter((item) => {
+          return item._id !== post._id || item.id !== post.id;
+        });
 
         setMyPosts(filteredPosts);
       } catch (error) {
@@ -49,8 +53,8 @@ const MyProfile = () => {
 
   return (
     <Profile
-      name='My'
-      desc='Welcome to your personalized profile page. Share your exceptional prompts and inspire others with the power of your imagination'
+      name="My"
+      desc="Welcome to your personalized profile page. Share your exceptional prompts and inspire others with the power of your imagination"
       data={myPosts}
       handleEdit={handleEdit}
       handleDelete={handleDelete}

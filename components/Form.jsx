@@ -1,6 +1,12 @@
+"use client";
 import Link from "next/link";
+import { useState } from "react";
 
 const Form = ({ type, post, setPost, submitting, handleSubmit }) => {
+  const [error, setError] = useState({
+    tag: "",
+    prompt: "",
+  });
   return (
     <section className="w-full max-w-full flex flex-col justify-center items-center">
       <h1 className="head_text text-left mt-0">
@@ -12,19 +18,37 @@ const Form = ({ type, post, setPost, submitting, handleSubmit }) => {
       </p>
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (post.tag && post.prompt) {
+            handleSubmit(e);
+          } else {
+            setError({
+              tag: post.tag ? "" : "Enter a valid Tag",
+              prompt: post.prompt ? "" : "Enter a Prompt",
+            });
+          }
+        }}
         className="mt-10 w-full max-w-2xl flex flex-col gap-7 glassmorphism"
       >
         <label>
           <span className="font-satoshi font-semibold text-base text-gray-700">
             Your AI Prompt
           </span>
-
+          <br />
+          {error.prompt && (
+            <span className="font-satoshi text-base text-red-300">
+              {error.prompt}
+            </span>
+          )}
           <textarea
             value={post.prompt}
-            onChange={(e) => setPost({ ...post, prompt: e.target.value })}
+            onChange={(e) => {
+              setPost({ ...post, prompt: e.target.value });
+              error.prompt && setError({ ...error, prompt: "" });
+            }}
             placeholder="Write your post here"
-            required
+            // required
             className="form_textarea "
           />
         </label>
@@ -33,15 +57,24 @@ const Form = ({ type, post, setPost, submitting, handleSubmit }) => {
           <span className="font-satoshi font-semibold text-base text-gray-700">
             Field of Prompt{" "}
             <span className="font-normal">
-              (#product, #webdevelopment, #idea, etc.)
+              (product, webdevelopment, idea, etc.)
             </span>
           </span>
+          <br />
+          {error.tag && (
+            <span className="font-satoshi text-base text-red-300">
+              {error.tag}
+            </span>
+          )}
           <input
             value={post.tag}
-            onChange={(e) => setPost({ ...post, tag: e.target.value })}
+            onChange={(e) => {
+              setPost({ ...post, tag: e.target.value });
+              error.tag && setError({ ...error, tag: "" });
+            }}
             type="text"
-            placeholder="#Tag"
-            required
+            placeholder="Enter space seperated key words for tags eg Webdev product Idea Software"
+            // required
             className="form_input"
           />
         </label>

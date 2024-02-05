@@ -7,29 +7,28 @@ import { NextResponse } from "next/server";
 
 //     const prompts = await Prompt.find({}).populate("creator");
 
-//     return new Response(JSON.stringify(prompts), { status: 200 });
+//////// return new Response(JSON.stringify(prompts), { status: 200 });
+// return NextResponse.json({ data: prompts }, { status: 201 });
+
 //   } catch (error) {
 //     return new Response("Failed to fetch all prompts", { status: 500 });
 //   }
 // };
-export const GET = async (request) => {
+
+export const GET = async (request, response) => {
   try {
-    let result;
     const joinQuery =
-      "SELECT * FROM user INNER JOIN promt ON user.id=promt.userid";
-    connectSQL.query(joinQuery, (err, res) => {
-      if (err) {
-        console.log(err, "err");
-        return new Response("Failed to fetch all prompts", {
-          status: 500,
-          err,
-        });
-      } else {
-        result = Object.values(JSON.parse(JSON.stringify(res)));
-      }
+      "SELECT * FROM user INNER JOIN promt ON user.id=promt.userid;";
+    const result = await new Promise((resolve, reject) => {
+      connectSQL.query(joinQuery, (err, result) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(result);
+      });
     });
-    return result;
+    return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {
-    console.log(error, "error");
+    return NextResponse.json({ error }, { status: 201 });
   }
 };
