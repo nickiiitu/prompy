@@ -40,12 +40,13 @@ const Feed = () => {
     fetchPosts();
   }, []);
 
-  const filterPrompts = (searchtext) => {
-    const regex = new RegExp(searchtext, "i"); // 'i' flag for case-insensitive search
+  const filterPrompts = (tagName) => {
+    const regex = new RegExp(tagName, "i"); // 'i' flag for case-insensitive search
+    const isTagPresent = allPosts.map((e) => e.tags?.includes(tagName));
     return allPosts.filter(
-      (item) =>
+      (item, i) =>
         regex.test(item?.creator?.username || item.username) ||
-        regex.test(item.tag) ||
+        isTagPresent[i] ||
         regex.test(item.prompt)
     );
   };
@@ -65,7 +66,6 @@ const Feed = () => {
 
   const handleTagClick = (tagName) => {
     setSearchText(tagName);
-
     const searchResult = filterPrompts(tagName);
     setSearchedResults(searchResult);
   };

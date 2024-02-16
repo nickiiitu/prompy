@@ -1,4 +1,4 @@
-add functionality to make multiple tags -- added
+//add functionality to make multiple tags -- added
 add functionality to make multiple tags fix while updating
-fix functionality of get prompts with multiple tags
-add functionality to search by tags
+//fix functionality of get prompts with multiple tags
+//add functionality to search by tags

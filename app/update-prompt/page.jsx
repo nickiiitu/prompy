@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Form from "@components/Form";
+import { useSession } from "next-auth/react";
 
 const UpdatePrompt = () => {
   const router = useRouter();
@@ -12,6 +13,7 @@ const UpdatePrompt = () => {
 
   const [post, setPost] = useState({ prompt: "", tag: "" });
   const [submitting, setIsSubmitting] = useState(false);
+  const { data: session } = useSession();
 
   useEffect(() => {
     const getPromptDetails = async () => {
@@ -37,6 +39,7 @@ const UpdatePrompt = () => {
         method: "PATCH",
         body: JSON.stringify({
           prompt: post.prompt,
+          userId: session?.user.id,
           tag: post.tag,
         }),
       });

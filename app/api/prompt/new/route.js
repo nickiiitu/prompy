@@ -11,7 +11,13 @@ export const POST = async (request) => {
         { status: 500 }
       );
     }
-
+    const userQuery = "Select * from user where id=?";
+    const userExist = await new Promise((resolve, reject) => {
+      connectSQL.query(userQuery, [userId], (err, res) => {
+        if (err) reject({ error: err });
+        resolve({ resolve: res });
+      });
+    });
     let tagArr = tag?.split(",");
     tagArr = tagArr.map((t) => t.trim().toLowerCase());
     const finalRes = await new Promise((resolve, reject) => {
@@ -46,7 +52,7 @@ export const POST = async (request) => {
                         console.error("Error inserting into tag table:", err);
                         reject(err);
                       } else {
-                        resolve(tagRes);
+                        // resolve(tagRes);
                       }
                     }
                   );
@@ -55,7 +61,9 @@ export const POST = async (request) => {
 
               connection.commit((err) => {
                 if (err) {
-                  reject(err);
+                  connection.rollback((e) => {
+                    reject(err);
+                  });
                 }
                 resolve(tagInsertPromises);
               });
@@ -64,6 +72,7 @@ export const POST = async (request) => {
         });
       });
     });
+    console.log(finalRes, "prjnkajn");
     return NextResponse.json(finalRes, { status: 200 });
     //   // console.log(userId, tag);
     //   //   try {
@@ -76,12 +85,6 @@ export const POST = async (request) => {
     // };
   } catch (error) {
     console.error("Caught error:", error);
-    const errorPromise = await new Promise((resolve, reject) => {
-      connection.rollback((e) => {
-        resolve(e);
-      });
-    });
-    console.log(errorPromise);
-    return NextResponse.json(errorPromise, { status: 500 });
+    return NextResponse.json(error, { status: 500 });
   }
 };

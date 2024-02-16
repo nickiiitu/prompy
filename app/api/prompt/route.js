@@ -27,7 +27,25 @@ export const GET = async (request, response) => {
         resolve(result);
       });
     });
-    return NextResponse.json({ data: result }, { status: 201 });
+    const tagArr = await Promise.all(
+      result.map(async (e, i) => {
+        const tags = await new Promise((resolve, reject) => {
+          const tagQuery = "Select * from tag where promptid=?";
+          connectSQL.query(tagQuery, [e.id], (err, result) => {
+            if (err) {
+              reject(err);
+            }
+            const tag = result.map((itm) => itm.tag);
+            resolve(tag);
+          });
+        });
+        return tags;
+      })
+    );
+    let newArr = result.map((e, i) => {
+      return { ...e, tags: tagArr[i] };
+    });
+    return NextResponse.json({ data: newArr }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error }, { status: 201 });
   }
