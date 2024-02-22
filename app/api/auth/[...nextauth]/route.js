@@ -23,11 +23,15 @@ const handler = NextAuth({
       let sessionUser = session;
       const userExisitQuery = "SELECT * from user where email=?";
       const result = await new Promise((resolve, reject) => {
-        connectSQL.query(userExisitQuery, session.user.email, (err, res) => {
-          if (res.length > 0) {
-            resolve(res);
-          }
-          reject(err);
+        connectSQL.getConnection((err, connection) => {
+          if (err) reject(err);
+          connection.query(userExisitQuery, session.user.email, (err, res) => {
+            connection.release();
+            if (res?.length > 0) {
+              resolve(res);
+            }
+            reject(err);
+          });
         });
       });
       sessionUser.user.id = result[0].id;

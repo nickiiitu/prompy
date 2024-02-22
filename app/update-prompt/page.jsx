@@ -19,9 +19,21 @@ const UpdatePrompt = () => {
     const getPromptDetails = async () => {
       const response = await fetch(`/api/prompt/${promptId}`);
       const data = await response.json();
+      let tagString = "";
+      data &&
+        data.tags.length > 0 &&
+        data.tags.map((e, i) => {
+          if (i == 0) {
+            tagString += e + " ,";
+          } else if (i == data.tags.length - 1) {
+            tagString += " " + e;
+          } else {
+            tagString += " " + e + " ,";
+          }
+        });
       setPost({
         prompt: data.prompt,
-        tag: data.tag,
+        tag: tagString,
       });
     };
 
@@ -53,7 +65,7 @@ const UpdatePrompt = () => {
       setIsSubmitting(false);
     }
   };
-
+  console.log(post);
   return (
     <Form
       type="Edit"

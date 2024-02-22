@@ -7,7 +7,8 @@ import PromptCard from "./PromptCard";
 const PromptCardList = ({ data, handleTagClick }) => {
   return (
     <div className="mt-16 prompt_layout">
-      {data.length > 0 &&
+      {data &&
+        data?.length > 0 &&
         data.map((post) => (
           <PromptCard
             key={post._id || post.id}
@@ -26,13 +27,26 @@ const Feed = () => {
   const [searchText, setSearchText] = useState("");
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [searchedResults, setSearchedResults] = useState([]);
-
+  const [error, setError] = useState({ status: false, message: "" });
+  useEffect(() => {
+    if (error.status) {
+      throw new Error(error.message);
+    }
+  }, [error]);
+  // if (searchText) throw new Error("Text");
   const fetchPosts = async () => {
     try {
       const data = await axios.get("/api/prompt");
       setAllPosts(data?.data?.data);
     } catch (error) {
-      console.log(error);
+      console.log(error, "error");
+      setError({
+        status: true,
+        message: JSON.stringify(
+          error?.response?.data?.error || "Unknown Error"
+        ),
+      });
+      // throw new Error("Error in api");
     }
   };
 

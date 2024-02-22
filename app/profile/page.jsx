@@ -36,15 +36,15 @@ const MyProfile = () => {
       const id = post._id ? post._id : post.id;
 
       try {
-        await fetch(`/api/prompt/${id.toString()}`, {
+        const response = await fetch(`/api/prompt/${id.toString()}`, {
           method: "DELETE",
         });
-
-        const filteredPosts = myPosts.filter((item) => {
-          return item._id !== post._id || item.id !== post.id;
-        });
-
-        setMyPosts(filteredPosts);
+        if (response?.ok) {
+          const filteredPosts = myPosts.filter((item) => {
+            return item._id !== post._id || item.id !== post.id;
+          });
+          setMyPosts(filteredPosts);
+        }
       } catch (error) {
         console.log(error);
       }

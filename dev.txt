@@ -1,4 +1,7 @@
 //add functionality to make multiple tags -- added
-add functionality to make multiple tags fix while updating
+//add functionality to make multiple tags fix while updating
 //fix functionality of get prompts with multiple tags
 //add functionality to search by tags
+//delete post fixed
+//fix error handling of create prompt and get all prompt
+fix error handling

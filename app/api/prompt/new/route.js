@@ -1,23 +1,28 @@
 import Prompt from "@models/prompt";
 import { connectSQL, connectToDB } from "@utils/database";
 import { NextResponse } from "next/server";
-
+//create new prompt
 export const POST = async (request) => {
   try {
+    // console.log(request, "req");
     const { userId, prompt, tag } = await request.json();
     if (!userId || !prompt || !tag) {
-      return NextResponse.json(
-        { error: "Fields in the request body are not correct" },
-        { status: 500 }
-      );
+      throw new Error("Fields in the request body are not correct");
     }
     const userQuery = "Select * from user where id=?";
     const userExist = await new Promise((resolve, reject) => {
-      connectSQL.query(userQuery, [userId], (err, res) => {
-        if (err) reject({ error: err });
-        resolve({ resolve: res });
+      connectSQL.getConnection((err, connection) => {
+        connection.query(userQuery, [userId], (err, res) => {
+          connection.release();
+          if (err || res.length === 0) {
+            err ? reject(err) : reject("User doesn't Exist");
+            return;
+          }
+          resolve(res);
+        });
       });
     });
+    // return;
     let tagArr = tag?.split(",");
     tagArr = tagArr.map((t) => t.trim().toLowerCase());
     const finalRes = await new Promise((resolve, reject) => {
@@ -52,28 +57,32 @@ export const POST = async (request) => {
                         console.error("Error inserting into tag table:", err);
                         reject(err);
                       } else {
-                        // resolve(tagRes);
+                        resolve(tagRes);
                       }
                     }
                   );
                 });
               });
-
               connection.commit((err) => {
                 if (err) {
                   connection.rollback((e) => {
                     reject(err);
                   });
                 }
+
                 resolve(tagInsertPromises);
               });
             }
           );
         });
+        connection.release();
       });
     });
-    console.log(finalRes, "prjnkajn");
-    return NextResponse.json(finalRes, { status: 200 });
+    await Promise.all(finalRes);
+    return NextResponse.json(
+      { data: "Prompt created successfully" },
+      { status: 200 }
+    );
     //   // console.log(userId, tag);
     //   //   try {
     //   //     // await connectToDB();
@@ -85,6 +94,9 @@ export const POST = async (request) => {
     // };
   } catch (error) {
     console.error("Caught error:", error);
-    return NextResponse.json(error, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || error },
+      { status: 500 }
+    );
   }
 };
