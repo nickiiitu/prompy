@@ -1,6 +1,12 @@
 import Prompt from "@models/prompt";
 import { connectSQL, connectToDB } from "@utils/database";
 import { NextResponse } from "next/server";
+
+const timeoutPromise = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    reject(new Error("Connection timed out"));
+  }, 10000); // 1 minute
+});
 //create new prompt
 export const POST = async (request) => {
   try {
@@ -10,8 +16,13 @@ export const POST = async (request) => {
       throw new Error("Fields in the request body are not correct");
     }
     const userQuery = "Select * from user where id=?";
-    const userExist = await new Promise((resolve, reject) => {
+    const userExistPromise = new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
+        if (err) {
+          console.log(err, "err");
+          reject(err);
+          return;
+        }
         connection.query(userQuery, [userId], (err, res) => {
           connection.release();
           if (err || res.length === 0) {
@@ -22,20 +33,27 @@ export const POST = async (request) => {
         });
       });
     });
-    // return;
+    await Promise.race([userExistPromise, timeoutPromise]);
+
     let tagArr = tag?.split(",");
+    if (tagArr.length === 0) {
+      throw new Error("Tags can't be empty");
+    }
     tagArr = tagArr.map((t) => t.trim().toLowerCase());
-    const finalRes = await new Promise((resolve, reject) => {
+
+    const finalResPromise = new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
         if (err) {
           console.error("Error getting SQL connection:", err);
           reject(err);
+          return;
         }
 
         connection.beginTransaction((err) => {
           if (err) {
             console.error("Error beginning transaction:", err);
             reject(err);
+            return;
           }
 
           connection.query(
@@ -45,10 +63,11 @@ export const POST = async (request) => {
               if (err) {
                 console.error("Error inserting into promt table:", err);
                 reject(err);
+                return;
               }
               const promptId = results.insertId;
               const tagInsertPromises = tagArr.map(async (tag) => {
-                const tagres = await new Promise((resolve, reject) => {
+                const tagresPromise = new Promise((resolve, reject) => {
                   connection.query(
                     "INSERT INTO tag (tag, promptid) VALUES (?, ?)",
                     [tag, promptId],
@@ -62,15 +81,16 @@ export const POST = async (request) => {
                     }
                   );
                 });
+                return await Promise.race([tagresPromise, timeoutPromise]);
               });
               connection.commit((err) => {
                 if (err) {
                   connection.rollback((e) => {
                     reject(err);
                   });
+                } else {
+                  resolve(tagInsertPromises);
                 }
-
-                resolve(tagInsertPromises);
               });
             }
           );
@@ -78,7 +98,7 @@ export const POST = async (request) => {
         connection.release();
       });
     });
-    await Promise.all(finalRes);
+    await Promise.race([finalResPromise, timeoutPromise]);
     return NextResponse.json(
       { data: "Prompt created successfully" },
       { status: 200 }

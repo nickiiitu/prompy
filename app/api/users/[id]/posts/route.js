@@ -15,26 +15,41 @@ import { NextResponse } from "next/server";
 //     });
 //   }
 // };
-
+const timeoutPromise = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    reject(new Error("Connection timed out"));
+  }, 10000); // 1 minute
+});
 //return all post of user with userid
 //-----------------SQL----------------------------
 export const GET = async (request, { params }) => {
   try {
+    //verify user
     const userQuery = "SELECT * from user where id=?";
-    await new Promise((resolve, reject) => {
+    const userExistPromise = new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
         if (err) {
           console.log(err, "err");
+          reject(err);
           return;
         }
         connection.query(userQuery, params.id, (err, result) => {
           connection.release();
-          if (err) reject(err);
+          if (err) {
+            reject(err);
+            return;
+          }
+          if (result?.length === 0) {
+            reject("User not found");
+            return;
+          }
           resolve(result);
         });
       });
     });
-    const res = await new Promise((resolve, reject) => {
+    await Promise.race([userExistPromise, timeoutPromise]);
+    //get prompts
+    const resPromise = await new Promise((resolve, reject) => {
       const findQuery =
         "SELECT * FROM user INNER JOIN promt ON user.id=promt.userid WHERE user.id=?;";
       connectSQL.getConnection((err, connection) => {
@@ -45,7 +60,6 @@ export const GET = async (request, { params }) => {
         connection.query(findQuery, params.id, (err, result) => {
           connection.release();
           if (err) {
-            console.log(err);
             reject(err);
           } else {
             resolve(result);
@@ -53,32 +67,54 @@ export const GET = async (request, { params }) => {
         });
       });
     });
-    console.log(res, "res");
-    const tagArr = await Promise.all(
+    const res = await Promise.race([resPromise, timeoutPromise]);
+    if (res.length === 0) {
+      return NextResponse.json({ data: res }, { status: 200 });
+    }
+    //get tags
+    const connectionPromise = await new Promise((resolve, reject) => {
+      connectSQL.getConnection((err, connection) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(connection);
+      });
+    });
+    const connection = await Promise.race([connectionPromise, timeoutPromise]);
+
+    const tagArrPromise = Promise.all(
       res.map(async (e) => {
-        const tags = await new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
           const tagQuery = "SELECT * from tag where promptid=?";
-          connectSQL.getConnection((err, connection) => {
+          connection.query(tagQuery, e.id, (err, result) => {
             if (err) {
+              connection.release();
               reject(err);
+              return;
             }
-            connection.query(tagQuery, e.id, (err, result) => {
-              if (err) reject(err);
-              const getTag = result.map((itm) => itm.tag);
-              resolve(getTag);
-            });
+            let getTag = new Array();
+            if (result?.length > 0) {
+              getTag = result.map((itm) => itm.tag);
+            }
+            resolve(getTag);
           });
         });
-        return tags;
       })
     );
+    const tagArr = await Promise.race([tagArrPromise, timeoutPromise]);
+
+    connection.release();
+
     const resWithTags = res.map((e, i) => {
       return { ...e, tags: tagArr[i] };
     });
-    // return new Response(JSON.stringify(res), { status: 200 });
-    return NextResponse.json(resWithTags, { status: 200 });
+    return NextResponse.json({ data: resWithTags }, { status: 200 });
   } catch (error) {
     console.log(error, "error");
-    return NextResponse.json(error, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || error },
+      { status: 500 }
+    );
   }
 };

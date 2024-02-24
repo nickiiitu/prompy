@@ -6,6 +6,7 @@ import User from "@models/user";
 import { connectToDB, connectSQL } from "@utils/database";
 import { NextResponse } from "next/server";
 import GitHubProvider from "next-auth/providers/github";
+import { connection } from "mongoose";
 const handler = NextAuth({
   providers: [
     GoogleProvider({
@@ -68,33 +69,56 @@ const handler = NextAuth({
     //---------------------SQL---------------------------
     async signIn({ account, profile, user, credentials }) {
       if (account.provider === "google" || account.provider === "github") {
+        const timeoutPromise = new Promise((resolve, reject) => {
+          setTimeout(() => {
+            reject(new Error("Connection timed out"));
+          }, 10000); // 1 minute
+        });
         try {
           // check if user already exists
-          const userExisitQuery = "SELECT * from user where email=?";
-          connectSQL.query(userExisitQuery, profile.email, (err, res) => {
-            if (res.length <= 0) {
-              const insertQuery =
-                "INSERT INTO user (username,email,image) VALUES (?,?,?)";
-
-              connectSQL.query(
-                insertQuery,
-                [
-                  profile.name.replace(" ", "").toLowerCase(),
-                  profile.email,
-                  profile.picture ? profile.picture : profile.avatar_url,
-                ],
-                (error, result) => {
-                  if (error) {
-                    console.log(error, "error");
-                  } else {
-                    // console.log(result, "result");
-                  }
+          const userExistPromise = new Promise((reject, resolve) => {
+            const userExisitQuery = "SELECT * from user where email=?";
+            connectSQL.getConnection((err, connection) => {
+              if (err) {
+                console.log(err, "err");
+                reject(err);
+                return;
+              }
+              connection.query(userExisitQuery, profile.email, (err, res) => {
+                if (err) {
+                  reject(err);
+                  return;
                 }
-              );
-            } else {
-              // console.log(res, "res");
-            }
+                if (res.length <= 0) {
+                  const insertQuery =
+                    "INSERT INTO user (username,email,image) VALUES (?,?,?)";
+
+                  connection.query(
+                    insertQuery,
+                    [
+                      profile.name.replace(" ", "").toLowerCase(),
+                      profile.email,
+                      profile.picture ? profile.picture : profile.avatar_url,
+                    ],
+                    (error, result) => {
+                      connection.release();
+                      if (error) {
+                        console.log(error, "error");
+                        reject(err);
+                      } else {
+                        resolve(result);
+                      }
+                    }
+                  );
+                } else {
+                  // console.log(res, "res");
+                  connection.release();
+                  resolve(res);
+                }
+              });
+            });
           });
+          const user = await Promise.race([userExistPromise, timeoutPromise]);
           return true;
         } catch (error) {
           console.log("Error checking if user exists: ", error.message);

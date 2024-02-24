@@ -4,11 +4,15 @@ import { NextResponse } from "next/server";
 
 //return prompt of given id
 //-----------------SQL--------------------
+const timeoutPromise = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    reject(new Error("Connection timed out"));
+  }, 10000); // 1 minute
+});
 export const GET = async (request, { params }) => {
   try {
     const findQuery = "SELECT * FROM promt where id=?";
-    // const userQuery="SELECT * FROM user where id=?"
-    const prompt = await new Promise((resolve, reject) => {
+    const promptPromise = new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
         if (err) {
           reject(err);
@@ -20,6 +24,10 @@ export const GET = async (request, { params }) => {
             reject(err);
             return;
           }
+          if (res.length === 0) {
+            resolve({ tags: [], data: res });
+            return;
+          }
           const tagQuery = "SELECT * FROM tag where promptid=?";
           connection.query(tagQuery, params.id, (err, res2) => {
             connection.release();
@@ -28,28 +36,38 @@ export const GET = async (request, { params }) => {
               reject(err);
               return;
             }
-            const results = res2.map((e) => e.tag);
+            let results = new Array();
+            if (res2?.length > 0) {
+              results = res2.map((e) => e.tag);
+            }
             resolve({ tags: results, data: res });
           });
         });
       });
     });
-    console.log(prompt);
-    const newPrompt = { ...prompt.data[0], tags: prompt.tags };
-    return NextResponse.json(newPrompt, { status: 200 });
+    const prompt = await Promise.race([promptPromise, timeoutPromise]);
+    let newPrompt = {};
+    if (prompt?.data.length > 0) {
+      newPrompt = { ...prompt?.data[0], tags: prompt?.tags };
+    } else {
+      throw new Error(`Prompt with id ${params.id} does not exist`);
+    }
+    return NextResponse.json({ data: newPrompt }, { status: 200 });
   } catch (error) {
     console.log(error, "getprompt");
-    return NextResponse.json(error, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || error },
+      { status: 500 }
+    );
   }
 };
 
 export const PATCH = async (request, { params }) => {
   const { prompt, tag } = await request.json();
   try {
-    const result = await new Promise((resolve, reject) => {
+    const resultPromise = new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
         if (err) {
-          console.log(err, "update");
           reject(err);
           return;
         }
@@ -61,7 +79,6 @@ export const PATCH = async (request, { params }) => {
             reject(err);
             return;
           }
-          // resolve(res);
         });
 
         //update new prompt
@@ -92,13 +109,12 @@ export const PATCH = async (request, { params }) => {
             });
           });
           connection.release();
-          console.log(res, "update");
           resolve(res);
         });
       });
     });
-    console.log(result, "update");
-    return NextResponse.json(result, { status: 200 });
+    const result = await Promise.race([resultPromise, timeoutPromise]);
+    return NextResponse.json({ data: result }, { status: 200 });
   } catch (error) {
     console.log(error, "update");
     return NextResponse.json({ error }, { status: 500 });
@@ -108,37 +124,43 @@ export const PATCH = async (request, { params }) => {
 //----------------------SQL---------------------------
 export const DELETE = async (request, { params }) => {
   try {
-    const result = await new Promise((resolve, reject) => {
-      const deleteQuery = "DELETE FROM promt WHERE id=?";
+    const resultPromise = await new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
         if (err) {
           console.log(err);
           reject(err);
           return;
         }
-        const tagQuery = "DELETE FROM tag where promptid=?";
-        connection.query(tagQuery, params.id, (err, res) => {
-          if (err) {
-            reject(err);
+        const PromptQuery = "SELECT * FROM promt where id=?";
+        connection.query(PromptQuery, params.id, (err, res1) => {
+          if (err || res1.length === 0) {
+            reject(err ? err : "Prompt does not exist");
             return;
           }
-          resolve(res);
-        });
-        connection.query(deleteQuery, params.id, (err, res) => {
-          if (err) {
-            console.log(err);
-            reject(err);
-          } else {
-            resolve(res);
-          }
+          const tagQuery = "DELETE FROM tag where promptid=?";
+          connection.query(tagQuery, params.id, (err, res) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+          });
+          const deleteQuery = "DELETE FROM promt WHERE id=?";
+          connection.query(deleteQuery, params.id, (err, res) => {
+            if (err) {
+              console.log(err);
+              reject(err);
+            }
+          });
+          resolve(res1);
         });
       });
     });
+    const result = await Promise.race([resultPromise, timeoutPromise]);
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.log(error, "delete");
     return NextResponse.json(
-      { message: "Couldn't delete Please retry" },
+      { error: error?.message || error || "Couldn't delete Please retry" },
       { status: 500 }
     );
   }

@@ -14,15 +14,19 @@ import { NextResponse } from "next/server";
 //     return new Response("Failed to fetch all prompts", { status: 500 });
 //   }
 // };
+const timeoutPromise = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    reject(new Error("Connection timed out"));
+  }, 10000); // 1 minute
+});
 // get all prompts
 export const GET = async (request, response) => {
   try {
     const joinQuery =
       "SELECT * FROM user INNER JOIN promt ON user.id=promt.userid;";
-    const result = await new Promise((resolve, reject) => {
+    const resultPromise = new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
         if (err) {
-          console.log(err, "error");
           reject(err);
           return;
         }
@@ -32,15 +36,14 @@ export const GET = async (request, response) => {
             console.log(err, "err");
             reject(err);
           } else {
-            console.log(result, "result");
             resolve(result);
           }
         });
       });
     });
+    const result = await Promise.race([resultPromise, timeoutPromise]);
 
-    // Open a single connection for tag queries
-    const connection = await new Promise((resolve, reject) => {
+    const connectionPromise = new Promise((resolve, reject) => {
       connectSQL.getConnection((err, connection) => {
         if (err) {
           reject(err);
@@ -49,23 +52,26 @@ export const GET = async (request, response) => {
         resolve(connection);
       });
     });
-
-    const tagArr = await Promise.all(
+    const connection = await Promise.race([connectionPromise, timeoutPromise]);
+    const tagArrPromise = Promise.all(
       result.map(async (e, i) => {
-        const tags = await new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
           const tagQuery = "SELECT * FROM tag WHERE promptid=?";
           connection.query(tagQuery, [e.id], (err, result) => {
             if (err) {
               reject(err);
               return;
             }
-            const tag = result.map((itm) => itm.tag);
+            let tag = new Array();
+            if (result.length > 0) {
+              tag = result.map((itm) => itm.tag);
+            }
             resolve(tag);
           });
         });
-        return tags;
       })
     );
+    const tagArr = await Promise.race([tagArrPromise, timeoutPromise]);
 
     connection.release();
     let newArr = result.map((e, i) => {
